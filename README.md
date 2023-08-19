@@ -1,13 +1,13 @@
-IK Spline Limb Tool
+# IK Spline Limb Tool
 
 This Python script is designed for Autodesk Maya and provides a tool to automate the creation of inverse kinematics (IK) spline limbs with bend controls, skinning joints, squash and stretch features, and other advanced controls. The tool supports both arm and leg types and streamlines the process of rigging character limbs. The script is suitable for use in animation and character rigging pipelines within Maya.
 
-Usage:
+# Usage:
 
-Open Maya.
-Run the example usage code in the Script Editor or via a Python script editor to create IK spline limbs based on selected joints.
+- Open Maya.
+- Run the example usage code in the Script Editor or via a Python script editor to create IK spline limbs based on selected joints.
 
-Features:
+# Features:
 
 - Automated creation of bend controls and IK splines for arm and leg types.
 - Control over the number of skinning joints and control joints size.
