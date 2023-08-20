@@ -1,18 +1,57 @@
 # IK Spline Limb Tool
 
-This Python script is designed for Autodesk Maya and provides a tool to automate the creation of inverse kinematics (IK) spline limbs with bend controls, skinning joints, squash and stretch features, and other advanced controls. The tool supports both arm and leg types and streamlines the process of rigging character limbs. The script is suitable for use in animation and character rigging pipelines within Maya.
+This tool is designed to automate the creation of an inverse kinematics (IK) Spline limb setup in Autodesk Maya. It generates a flexible limb rig with advanced controls for bending, stretching, and squashing. The tool supports both arm and leg types and streamlines the process of rigging character limbs. The script is suitable for use in animation and character rigging pipelines within Maya.
 
-# Usage:
+## Usage
 
-- Open Maya.
-- Run the example usage code in the Script Editor or via a Python script editor to create IK spline limbs based on selected joints.
+To use the IK Spline Limb Tool, follow these steps:
 
-# Features:
+1. Open Autodesk Maya.
+2. Copy the provided Python script to a Python script editor within Maya.
+3. Select and run the script.
 
-- Automated creation of bend controls and IK splines for arm and leg types.
-- Control over the number of skinning joints and control joints size.
-- Supports squash and stretch functionality for realistic limb deformation.
+After running the script, you can create IK Spline limbs using the provided functions. The script includes an example of how to use these functions to create a bendy limb. You can customize the limb type (arm or leg), the number of skinning joints, and the joint radius according to your requirements.
+
+## Example Usage
+
+```python
+from importlib import reload
+import IKspline_Limb_Tool
+reload(IKspline_Limb_Tool)
+
+limb_type = cmds.confirmDialog(
+    title='Limb Type',
+    message='Select the limb type:',
+    button=['Arm', 'Leg']
+)
+
+# Example values for the number of skinning joints: Modify these values as needed
+num_SKIN_jnts_up = 5
+num_SKIN_jnts_low = 5
+# Change the radius of the control joints
+jnt_radius = 2
+
+IKspline_Limb_Tool.create_bendy_limb(limb_type, num_SKIN_jnts_up, num_SKIN_jnts_low, jnt_radius)
+```
+
+## Features
+
+- Automatically creates bendy IK Spline limbs for both arms and legs.
+- Generates advanced control joints for better manipulation.
+- Supports adjustable number of skinning joints and control joints size.
+- Incorporates stretching and squashing functionality for natural deformations.
 - Hierarchical organization of limb components for easy management.
 - Provides informative feedback through the Maya interface.
 
-Please note that this script is specifically designed for a specific project in Maya and may require some modifications or adjustments to suit your specific needs and character rigs.
+## Important Notes
+
+- This tool requires Autodesk Maya to run.
+- The provided Python script contains comments explaining the various functions and their usage.
+
+## Credits
+
+This tool was created by Léa Béchard. For more information, contact lbechard@artfx.fr.
+
+---
+
+*Disclaimer: This tool is provided as-is and may have limitations or issues. Please note that this script is designed for a specific project in Maya and may require some modifications or adjustments to suit your specific needs and character rigs.*
