@@ -14,7 +14,7 @@ limb_type = cmds.confirmDialog( title = 'Limb Type', message = 'Select the limb 
 # Example values for the number of skinning joints : Modify these values as needed
 num_SKIN_jnts_up = 5
 num_SKIN_jnts_low = 5
-# Change the radius of the control joints if needed
+# Change the radius of the control joints 
 jnt_radius = 2 
 
 IKspline_Limb_Tool.create_bendy_limb( limb_type, num_SKIN_jnts_up, num_SKIN_jnts_low, jnt_radius )
@@ -33,14 +33,48 @@ def setZero( target ):
     for attr in attrs:
         cmds.setAttr( target + attr, 0 if 'scale' not in attr else 1 )
 
-def select_fk_joints( ):
+def get_selection( limb_type ):
+    # Get the selection, make sure that it's three joints, raise an error if necessary and identify the type of limb we are working on
     try:
-        selected_joints = cmds.ls( sl = True )
-        if len( selected_joints ) != 3:
-            raise ValueError( "// Please select exactly 3 FK joints of the Limb. //" )
-        return selected_joints
+        [ start_jnt, mid_jnt, end_jnt ] = cmds.ls( sl = True )
     except:
-        raise ValueError( "// Please select all the 3 FK joints of the Limb. //" )
+        raise ValueError( '// Please select all the 3 FK joints of the Limb. //' )
+    for jnt in [ start_jnt, mid_jnt, end_jnt ]:
+        if not cmds.objectType( jnt, isType = 'joint' ):
+            raise ValueError( '// Please select joints of the limb. //' )
+    if limb_type == 'Arm':
+        half_bone_name = ['shoulder', 'elbow', 'wrist']
+    elif limb_type == 'Leg':
+        half_bone_name = ['hip', 'knee', 'ankle']
+    else:
+        raise ValueError( '// Invalid limb type. Use "Arm" or "Leg". //' )
+
+    return  start_jnt, mid_jnt, end_jnt, half_bone_name
+
+def create_system_grp( jnt, prefix ):
+    # Creating the system group hierarchy
+    system_grp = cmds.group( name = prefix + '_system', em = 1 )
+    cmds.matchTransform( system_grp, jnt, pos = 1, rot = 1, scl = 0 )
+
+    return system_grp
+
+def limb_ctrl_jnt_grp( jnt, prefix, sufix, jnt_radius, system_grp ):
+    # Creating the root and tip CTRL joints for each system and their OFFSET
+    limb_ctrl_jnt = cmds.duplicate( jnt, name = prefix + sufix, po = 1 )[0]
+    limb_ctrl_jnt_grp = cmds.group( name = str( limb_ctrl_jnt ) + '_OFFSET', em = 1 )
+
+    cmds.setAttr( limb_ctrl_jnt + '.radius', jnt_radius )
+    cmds.matchTransform( limb_ctrl_jnt_grp, limb_ctrl_jnt, scl = 0 )
+    cmds.parent( limb_ctrl_jnt, limb_ctrl_jnt_grp )
+    cmds.parent( limb_ctrl_jnt_grp, system_grp )
+
+    return limb_ctrl_jnt, limb_ctrl_jnt_grp
+
+def refine_curve( limb_crv ):
+    # Refine the IK Spline curve ( Changes the behaviour )
+    cmds.setAttr( limb_crv + '.inheritsTransform', 0 )
+    cmds.rebuildCurve( limb_crv, kcp = 1, d = 2, name = limb_crv + '_rebuildCrv' )
+    cmds.setAttr( limb_crv + '.spans', 8 )
 
 ### SETUPS
 
@@ -61,12 +95,12 @@ def create_bend_control_joints( start_jnt, prefix, jnt_radius, root_jnt_grp, tip
     cmds.rename( aim_up_LOC, bend_jnt + '_aim_up_LOC' )
     cmds.parent( aim_up_LOC, do_not_touch )
     cmds.pointConstraint( root_jnt_grp, tip_jnt_grp, aim_up_LOC, mo = 0, name = aim_up_LOC + '_pntCstr' )
-    cmds.orientConstraint( root_jnt_grp, tip_jnt_grp, aim_up_LOC, mo = 0, name = aim_up_LOC + '_ori_cstr' )
-    cmds.setAttr( aim_up_LOC + '_ori_cstr.interpType', 2 ) # ( with Shortest parameter )
+    cmds.orientConstraint( root_jnt_grp, tip_jnt_grp, aim_up_LOC, mo = 0, name = aim_up_LOC + '_oriCstr' )
+    cmds.setAttr( aim_up_LOC + '_oriCstr.interpType', 2 ) # ( with Shortest parameter )
     cmds.aimConstraint( tip_jnt_grp, bend_jnt_grp, 
         aimVector = ( 0, 1, 0 ), 
         upVector = ( 1, 0, 0 ), 
-        worldUpType = "objectrotation", 
+        worldUpType = 'objectrotation', 
         worldUpVector = ( 1, 0, 0 ), 
         worldUpObject = aim_up_LOC, 
         name = bend_jnt + '_aimCstr', mo = 0 )
@@ -78,7 +112,6 @@ def create_bend_control_joints( start_jnt, prefix, jnt_radius, root_jnt_grp, tip
     cmds.delete( __ )
     cmds.parent( bend_jnt_CTRL, bend_jnt_grp )
     setZero( bend_jnt_CTRL )
-
     cmds.parent( bend_jnt, bend_jnt_CTRL )
 
     return bend_jnt
@@ -110,7 +143,7 @@ def create_SKIN_joints( num_SKIN_jnts, trans_y, root_jnt, prefix, jnt_radius, sy
     limb_SKIN_jnts[0] = cmds.rename( limb_SKIN_jnts[0], prefix + '_01_notSKIN' )
     limb_SKIN_jnts[-1] = cmds.rename( limb_SKIN_jnts[-1], prefix + '_tip_notSKIN' )
 
-    return limb_SKIN_jnts, nb_jnts, trans_y_jnts
+    return limb_SKIN_jnts, nb_jnts
 
 def create_ik_spline( prefix, limb_SKIN_jnts, do_not_touch, root_jnt, bend_jnt, tip_jnt, trans_y ):
 
@@ -120,9 +153,9 @@ def create_ik_spline( prefix, limb_SKIN_jnts, do_not_touch, root_jnt, bend_jnt, 
     and set the advanced twist controls 
     '''
 
-    limb_ik_hdl, limb_eff, limb_crv = cmds.ikHandle( name = prefix + "_IK_HDL", sol = 'ikSplineSolver', sj = limb_SKIN_jnts[0], ee = limb_SKIN_jnts[-1] )
-    limb_crv = cmds.rename( limb_crv, prefix + "_crv" )
-    limb_eff = cmds.rename( limb_eff, prefix + "_eff" )
+    limb_ik_hdl, limb_eff, limb_crv = cmds.ikHandle( name = prefix + '_IK_HDL', sol = 'ikSplineSolver', sj = limb_SKIN_jnts[0], ee = limb_SKIN_jnts[-1] )
+    limb_crv = cmds.rename( limb_crv, prefix + '_crv' )
+    limb_eff = cmds.rename( limb_eff, prefix + '_eff' )
     cmds.parent( limb_eff, limb_SKIN_jnts[-1] )
     cmds.parent( limb_crv, limb_ik_hdl, do_not_touch )
     cmds.select( root_jnt, bend_jnt, tip_jnt, limb_crv )
@@ -137,11 +170,9 @@ def create_ik_spline( prefix, limb_SKIN_jnts, do_not_touch, root_jnt, bend_jnt, 
     cmds.setAttr( limb_ik_hdl + '.dWorldUpType', 4 )
     cmds.setAttr( limb_ik_hdl + '.dForwardAxis', attr[0] )
     cmds.setAttr( limb_ik_hdl + '.dWorldUpAxis', attr[1] )
-
     cmds.setAttr( limb_ik_hdl + '.dWorldUpVectorX', attr[2] )
     cmds.setAttr( limb_ik_hdl + '.dWorldUpVectorY', 0 )
     cmds.setAttr( limb_ik_hdl + '.dWorldUpVectorZ', 0 )
-
     cmds.connectAttr( root_jnt + '.worldMatrix[0]', limb_ik_hdl + '.dWorldUpMatrix', f = 1 )
     cmds.setAttr( limb_ik_hdl + '.dWorldUpVectorEndX', attr[2] )
     cmds.setAttr( limb_ik_hdl + '.dWorldUpVectorEndY', 0 )
@@ -210,21 +241,15 @@ def create_squash_and_stretch( nb_jnts, prefix, limb_crv, trans_y, limb_SKIN_jnt
         cmds.connectAttr( vc_invert + '.outputX', limb_SKIN_jnts[int( i )] + '.scaleX', f = 1 )
         cmds.connectAttr( vc_invert + '.outputX', limb_SKIN_jnts[int( i )] + '.scaleZ', f = 1 )
 
-def refine_curve( limb_crv ):
+def create_half_bone( position, limb_parts, joint, previous_jnt, side_name, half_bone_name, jnt_radius, trans_y ):
 
-    cmds.setAttr( limb_crv + '.inheritsTransform', 0 )
-    cmds.rebuildCurve( limb_crv, kcp = 1, d = 2, name = limb_crv + '_rebuildCrv' )
-    cmds.setAttr( limb_crv + '.spans', 8 )
-
-def create_half_bone( position, joint, previous_jnt, side_name, half_bone_name, jnt_radius, trans_y, trans_y_jnts, upper_jnt_grp , lower_jnt_grp ):
-
-    half_bone = cmds.duplicate( joint, name = side_name + half_bone_name + '_HalfBone', po = 1 )[0]
+    half_bone = cmds.duplicate( joint, name = side_name + half_bone_name + '_HalfBone_JNT', po = 1 )[0]
     half_bone_grp = cmds.group( name = str( half_bone ) + '_OFFSET', em = 1 )
     cmds.setAttr( half_bone + '.radius', jnt_radius*2 )
     cmds.matchTransform( half_bone_grp, half_bone, scl = 0 )
     cmds.parent( half_bone, half_bone_grp )
     cmds.pointConstraint( joint, half_bone, name = half_bone + '_pntCstr', mo = 0 )
-    ori_cstr = cmds.orientConstraint( previous_jnt, joint, half_bone, name = half_bone + '_ori_cstr', mo = 1 )[0]
+    ori_cstr = cmds.orientConstraint( previous_jnt, joint, half_bone, name = half_bone + '_oriCstr', mo = 1 )[0]
     cmds.setAttr( ori_cstr + '.interpType', 2 ) # ( with Shortest parameter )
 
     if position == 'mid':
@@ -232,18 +257,15 @@ def create_half_bone( position, joint, previous_jnt, side_name, half_bone_name, 
         cmds.delete( __ )
         cmds.parent( half_bone_CTRL, half_bone )
         setZero( half_bone_CTRL )
-        cmds.parent( upper_jnt_grp, half_bone_CTRL ) # parent upper_limb_tip_jnt_grp under the halfbone
-        cmds.parent( lower_jnt_grp, half_bone_CTRL ) # parent lower_limb_root_jnt_grp under the halfbone
+        cmds.parent( limb_parts['upper']['ctrl_jnt_grp'][1], half_bone_CTRL ) # parent upper_limb_tip_jnt_grp under the halfbone
+        cmds.parent( limb_parts['lower']['ctrl_jnt_grp'][0], half_bone_CTRL ) # parent lower_limb_root_jnt_grp under the halfbone
 
     if position == 'root':
-        cmds.parent( upper_jnt_grp, half_bone ) # parent upper_limb_root_jnt_grp under the halfbone
+        cmds.parent( limb_parts['upper']['ctrl_jnt_grp'][0], half_bone ) # parent upper_limb_root_jnt_grp under the halfbone
 
     half_bone_SKIN = cmds.duplicate( half_bone, name = side_name + half_bone_name + '_HalfBone_SKIN', po = 1 )[0]
     cmds.setAttr( half_bone_SKIN + '.radius', jnt_radius/2 )
-    if position == 'mid':
-        cmds.parent( half_bone_SKIN, half_bone_CTRL )
-    else:
-        cmds.parent( half_bone_SKIN, half_bone )
+    cmds.parent( half_bone_SKIN, half_bone_CTRL if position == 'mid' else half_bone )
 
     if position == 'tip':
         aim_LOC = cmds.createNode( 'locator', name = half_bone_SKIN + '_aim_LOCShape' )
@@ -251,7 +273,7 @@ def create_half_bone( position, joint, previous_jnt, side_name, half_bone_name, 
         cmds.rename( aim_LOC, half_bone_SKIN + '_aim_LOC' )
         cmds.parent( aim_LOC, half_bone )
         setZero( aim_LOC )
-        cmds.setAttr( aim_LOC + '.translateY', trans_y_jnts )
+        cmds.setAttr( aim_LOC + '.translateY', trans_y )
         
         if abs( trans_y ) == trans_y:
             main_axis = 1
@@ -260,12 +282,12 @@ def create_half_bone( position, joint, previous_jnt, side_name, half_bone_name, 
         cmds.aimConstraint( aim_LOC, half_bone_SKIN, 
             aimVector = ( 0, main_axis, 0 ), 
             upVector = ( 1, 0, 0 ), 
-            worldUpType = "objectrotation", 
+            worldUpType = 'objectrotation', 
             worldUpVector = ( 1, 0, 0 ), 
             worldUpObject = joint, 
             name = half_bone_SKIN + '_aimCstr', mo = 0 )
 
-        cmds.parent( lower_jnt_grp, half_bone_SKIN )
+        cmds.parent( limb_parts['lower']['ctrl_jnt_grp'][1], half_bone_SKIN ) # parent lower_limb_tip_jnt_grp under the halfbone
 
     return half_bone_grp
 
@@ -273,100 +295,53 @@ def create_half_bone( position, joint, previous_jnt, side_name, half_bone_name, 
 
 def create_bendy_limb( limb_type, num_SKIN_jnts_up, num_SKIN_jnts_low, jnt_radius ):
 
-    if limb_type == 'Arm':
-        half_bone_name = ['shoulder', 'elbow', 'wrist']
-    elif limb_type == 'Leg':
-        half_bone_name = ['hip', 'knee', 'ankle']
-    else:
-        cmds.warning( '// Invalid limb type. Use "Arm" or "Leg". //' )
-        return
-
-    start_jnt, mid_jnt, end_jnt = select_fk_joints( )[:3]
+    start_jnt, mid_jnt, end_jnt, half_bone_name = get_selection( limb_type )
     side_name = start_jnt.split( '_' )[0] + '_'
-
-    for jnt in [ start_jnt, mid_jnt, end_jnt ]:
-        if not cmds.objectType( jnt, isType = 'joint' ):
-            cmds.warning( '// Please select joints of the limb. //' )
-            return
-
     num_SKIN_jnts = [ num_SKIN_jnts_up, num_SKIN_jnts_low ]
 
-    # Creating system group hierarchy
+    limb_parts = { 'upper': {
+                      'root_jnt': start_jnt,
+                      'tip_jnt': mid_jnt,
+                      'num_SKIN_jnts': num_SKIN_jnts_up },
+                   'lower': {
+                      'root_jnt': mid_jnt,
+                      'tip_jnt': end_jnt,
+                      'num_SKIN_jnts': num_SKIN_jnts_low } }
 
-    upper_system_grp = cmds.group( name = side_name + 'upper' + limb_type + '_system', em = 1 )
-    cmds.matchTransform( upper_system_grp, start_jnt, pos = 1, rot = 1, scl = 0 )
-
-    lower_system_grp = cmds.group( name = side_name + 'lower' + limb_type + '_system', em = 1 )
-    cmds.matchTransform( lower_system_grp, mid_jnt, pos = 1, rot = 1, scl = 0 )
-
-    system_grps = [ upper_system_grp, lower_system_grp ]
     do_not_touch = cmds.group( name = side_name + limb_type + '_do_not_touch', em = 1 )
 
-    upperlimb_root_jnt = cmds.duplicate( start_jnt, name = side_name + 'upper' + limb_type + '_Root_CTRL_JNT', po = 1 )[0]
-    upper_limb_root_jnt_grp = cmds.group( name = str( upperlimb_root_jnt ) + '_OFFSET', em = 1 )
-    upperlimb_tip_jnt = cmds.duplicate( mid_jnt, name = side_name + 'upper' + limb_type + '_Tip_CTRL_JNT', po = 1 )[0]
-    upper_limb_tip_jnt_grp = cmds.group( name = str( upperlimb_tip_jnt ) + '_OFFSET', em = 1 )
-
-    lower_limb_root_jnt = cmds.duplicate( mid_jnt, name = side_name + 'lower' + limb_type + '_Root_CTRL_JNT', po = 1 )[0]
-    lower_limb_root_jnt_grp = cmds.group( name = str( lower_limb_root_jnt ) + '_OFFSET', em = 1 )
-    lower_limb_tip_jnt = cmds.duplicate( end_jnt, name = side_name + 'lower' + limb_type + '_Tip_CTRL_JNT', po = 1 )[0]
-    lower_limb_tip_jnt_grp = cmds.group( name = str( lower_limb_tip_jnt ) + '_OFFSET', em = 1 )
-
-    limb_jnts = [ upperlimb_root_jnt, upperlimb_tip_jnt, lower_limb_root_jnt, lower_limb_tip_jnt ]
-    limb_jnts_grp = [ upper_limb_root_jnt_grp, upper_limb_tip_jnt_grp, lower_limb_root_jnt_grp, lower_limb_tip_jnt_grp ]
-
-    for i, limb_JNT in enumerate( limb_jnts ):
-        cmds.setAttr( limb_JNT + '.radius', jnt_radius )
-        cmds.matchTransform( limb_jnts_grp[i], limb_JNT, scl = 0 )
-        cmds.parent( limb_JNT, limb_jnts_grp[i] )
-
-        if i < 2:
-            cmds.parent( limb_jnts_grp[i], upper_system_grp )
-        else:
-            cmds.parent( limb_jnts_grp[i], lower_system_grp )
-
-    limb_root_jnt = [ upperlimb_root_jnt, lower_limb_root_jnt ]
-    limb_tip_jnt = [ upperlimb_tip_jnt, lower_limb_tip_jnt ]
-    limb_root_jnt_grp = [ upper_limb_root_jnt_grp, lower_limb_root_jnt_grp ]
-    limb_tip_jnt_grp = [ upper_limb_tip_jnt_grp, lower_limb_tip_jnt_grp ]
-
-    trans_y_jnt = [ mid_jnt, end_jnt ]
-
-    # Creating the upper and lower systems
-
-    for x, uplo in enumerate( ['upper', 'lower'] ):
-
-        root_jnt = limb_root_jnt[x]
-        tip_jnt = limb_tip_jnt[x]
-        root_jnt_grp = limb_root_jnt_grp[x]
-        tip_jnt_grp = limb_tip_jnt_grp[x]
-
-        trans_y = cmds.getAttr( trans_y_jnt[x] + '.translateY' )
+    for uplo, info in limb_parts.items():
+        root_jnt = info[ 'root_jnt' ]
+        tip_jnt = info[ 'tip_jnt' ]
+        num_SKIN_jnts = info[ 'num_SKIN_jnts' ]
+        trans_y = cmds.getAttr(tip_jnt + '.translateY') # trans_y_jnt = tip_jnt
         prefix = side_name + uplo + limb_type
 
-        bend_jnt = create_bend_control_joints( start_jnt, prefix, jnt_radius, root_jnt_grp, tip_jnt_grp, system_grps[x], do_not_touch )
-        limb_SKIN_jnts, nb_jnts, trans_y_jnts = create_SKIN_joints( num_SKIN_jnts[x], trans_y, root_jnt, prefix, jnt_radius, system_grps[x], tip_jnt )
-        
-        limb_crv = create_ik_spline( prefix, limb_SKIN_jnts, do_not_touch, root_jnt, bend_jnt, tip_jnt, trans_y )
-        
-        create_squash_and_stretch( nb_jnts, prefix, limb_crv, trans_y, limb_SKIN_jnts, start_jnt )
-        
+        # Creates each bendy system : ctrl joints, skin joints, ik spline with refined curve and squash and stretch
+        system_grp = create_system_grp( root_jnt, prefix )
+        limb_parts[uplo]['system_grp'] = system_grp
+        root_ctrl_jnt, root_ctrl_jnt_grp = limb_ctrl_jnt_grp( root_jnt, prefix, '_Root_CTRL_JNT', jnt_radius, system_grp )
+        tip_ctrl_jnt, tip_ctrl_jnt_grp = limb_ctrl_jnt_grp( tip_jnt, prefix, '_Tip_CTRL_JNT', jnt_radius, system_grp )
+        limb_parts[uplo]['ctrl_jnt_grp'] = [ root_ctrl_jnt_grp, tip_ctrl_jnt_grp ] 
+        bend_jnt = create_bend_control_joints( root_jnt, prefix, jnt_radius, root_ctrl_jnt_grp, tip_ctrl_jnt_grp, system_grp, do_not_touch )
+        limb_SKIN_jnts, nb_jnts = create_SKIN_joints( num_SKIN_jnts, trans_y, root_ctrl_jnt, prefix, jnt_radius, system_grp, tip_ctrl_jnt )
+        limb_crv = create_ik_spline( prefix, limb_SKIN_jnts, do_not_touch, root_ctrl_jnt, bend_jnt, tip_ctrl_jnt, trans_y )
+        create_squash_and_stretch( nb_jnts, prefix, limb_crv, trans_y, limb_SKIN_jnts, root_jnt )
         refine_curve( limb_crv )
 
     # Creates the mid HalfBone joint ( elbow or knee ) and constrains it to the upper and lower systems
-    mid_half_bone_grp = create_half_bone( 'mid', mid_jnt, start_jnt, side_name, half_bone_name[1], jnt_radius, trans_y, trans_y_jnts, upper_limb_tip_jnt_grp , lower_limb_root_jnt_grp )
+    mid_half_bone_grp = create_half_bone( 'mid', limb_parts, mid_jnt, start_jnt, side_name, half_bone_name[1], jnt_radius, trans_y )
 
     # Creates the root HalfBone joint ( shoulder or hip ) and constrains it to the existing FK joint and upper system
-    root_half_bone_grp = create_half_bone( 'root', start_jnt, cmds.listRelatives( start_jnt , p = 1 ) [0], side_name, half_bone_name[0], jnt_radius, trans_y, trans_y_jnts, upper_limb_root_jnt_grp, '' )
+    root_half_bone_grp = create_half_bone( 'root', limb_parts, start_jnt, cmds.listRelatives( start_jnt , p = 1 ) [0], side_name, half_bone_name[0], jnt_radius, trans_y )
 
     # Creates the tip HalfBone joint ( wrist or ankle ) and constrains it to the lower system and the existing FK joint 
-    tip_half_bone_grp = create_half_bone( 'tip', end_jnt, mid_jnt, side_name, half_bone_name[2], jnt_radius, trans_y, trans_y_jnts, '', lower_limb_tip_jnt_grp )
+    tip_half_bone_grp = create_half_bone( 'tip', limb_parts, end_jnt, mid_jnt, side_name, half_bone_name[2], jnt_radius, trans_y )
     
     #  Final Offset Organisation
-
     ik_spline_limb_grp = cmds.group( name = side_name + limb_type + '_IkSpline_limb_OFFSET', em = 1 )
-    cmds.parent( upper_system_grp, 
-                lower_system_grp, 
+    cmds.parent( limb_parts['upper']['system_grp'], 
+                limb_parts['lower']['system_grp'], 
                 root_half_bone_grp, 
                 mid_half_bone_grp, 
                 tip_half_bone_grp, 
