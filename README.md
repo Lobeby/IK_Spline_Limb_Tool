@@ -2,7 +2,9 @@
 
 This tool is designed to automate the creation of an inverse kinematics (IK) Spline limb setup in Autodesk Maya. It generates a flexible limb rig with advanced controls for bending, stretching, and squashing. The tool supports both arm and leg types and streamlines the process of rigging character limbs. The script is suitable for use in animation and character rigging pipelines within Maya.
 
-## Usage
+![Thumbnail_Custom_Github_upgrade](https://github.com/Lobeby/IK_Spline_Limb_Tool/assets/94933916/d59117e3-26ee-49ea-bbb3-a72e4e953fa5)
+
+## Installation
 
 To use the IK Spline Limb Tool, follow these steps:
 
@@ -49,10 +51,6 @@ IKspline_Limb_Tool.create_bendy_limb(limb_type, num_SKIN_jnts_up, num_SKIN_jnts_
 - The provided Python script contains comments explaining the various functions and their usage.
 - Please note that this script is designed for a specific project and may require some modifications or adjustments to suit your specific needs and character rigs.
 
-## Credits
-
-This tool was created by Léa Béchard. For more information, contact lbechard@artfx.fr.
-
 ---
 
-*Disclaimer: This tool is provided as-is and may have limitations or issues. Please note that this script is designed for a specific project in Maya and may require some modifications or adjustments to suit your specific needs and character rigs.*
+*Credits : This tool was created by Léa Béchard. For more information, contact lbechard@artfx.fr.*
