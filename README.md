@@ -6,9 +6,9 @@ This tool is designed to automate the creation of an inverse kinematics (IK) Spl
 
 To use the IK Spline Limb Tool, follow these steps:
 
-1. Open Autodesk Maya.
+1. Open the Autodesk Maya test scene.
 2. Copy the provided Python script to a Python script editor within Maya.
-3. Select and run the script.
+3. Select the three joints and run the script.
 
 After running the script, you can create IK Spline limbs using the provided functions. The script includes an example of how to use these functions to create a bendy limb. You can customize the limb type (arm or leg), the number of skinning joints, and the joint radius according to your requirements.
 
@@ -47,6 +47,7 @@ IKspline_Limb_Tool.create_bendy_limb(limb_type, num_SKIN_jnts_up, num_SKIN_jnts_
 
 - This tool requires Autodesk Maya to run.
 - The provided Python script contains comments explaining the various functions and their usage.
+- Please note that this script is designed for a specific project and may require some modifications or adjustments to suit your specific needs and character rigs.
 
 ## Credits
 
