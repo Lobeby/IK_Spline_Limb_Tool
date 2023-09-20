@@ -299,15 +299,18 @@ def create_bendy_limb( limb_type, num_SKIN_jnts_up, num_SKIN_jnts_low, jnt_radiu
     side_name = start_jnt.split( '_' )[0] + '_'
     num_SKIN_jnts = [ num_SKIN_jnts_up, num_SKIN_jnts_low ]
 
-    limb_parts = { 'upper': {
-                      'root_jnt': start_jnt,
-                      'tip_jnt': mid_jnt,
-                      'num_SKIN_jnts': num_SKIN_jnts_up },
-                   'lower': {
-                      'root_jnt': mid_jnt,
-                      'tip_jnt': end_jnt,
-                      'num_SKIN_jnts': num_SKIN_jnts_low } }
-
+    limb_parts = {
+        "upper": {
+            "root_jnt": start_jnt,
+            "tip_jnt": mid_jnt,
+            "num_SKIN_jnts": num_SKIN_jnts_up,
+        },
+        "lower": {
+            "root_jnt": mid_jnt,
+            "tip_jnt": end_jnt,
+            "num_SKIN_jnts": num_SKIN_jnts_low,
+        },
+    }
     do_not_touch = cmds.group( name = side_name + limb_type + '_do_not_touch', em = 1 )
 
     for uplo, info in limb_parts.items():
@@ -370,7 +373,6 @@ def create_bendy_limb( limb_type, num_SKIN_jnts_up, num_SKIN_jnts_low, jnt_radiu
         jnt_radius,
         trans_y,
     )
-
     # Creates the mid HalfBone joint ( elbow or knee ) and constrains it to the upper and lower systems
     mid_half_bone_grp = create_half_bone(
         "mid",
@@ -382,7 +384,6 @@ def create_bendy_limb( limb_type, num_SKIN_jnts_up, num_SKIN_jnts_low, jnt_radiu
         jnt_radius,
         trans_y,
     )
-
     # Creates the tip HalfBone joint ( wrist or ankle ) and constrains it to the lower system and the existing FK joint
     tip_half_bone_grp = create_half_bone(
         "tip",
@@ -394,7 +395,6 @@ def create_bendy_limb( limb_type, num_SKIN_jnts_up, num_SKIN_jnts_low, jnt_radiu
         jnt_radius,
         trans_y,
     )
-
     #  Final Offset Organisation
     ik_spline_limb_grp = cmds.group(
         name=side_name + limb_type + "_IkSpline_limb_OFFSET", em=1
@@ -408,7 +408,4 @@ def create_bendy_limb( limb_type, num_SKIN_jnts_up, num_SKIN_jnts_low, jnt_radiu
         do_not_touch,
         ik_spline_limb_grp,
     )
-
-    om.MGlobal.displayInfo(
-        "// Result: " + side_name + limb_type + "_IkSpline_Limb created // "
-    )
+    om.MGlobal.displayInfo( "// Result: " + side_name + limb_type + "_IkSpline_Limb created // " )
